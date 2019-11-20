@@ -43,7 +43,7 @@ snapshot:
 		goreng/golang-cross:$(GO_BUILDER_VERSION) \
 		goreleaser --snapshot --rm-dist
 
-release: changelog
+release:
 	docker run --rm --privileged \
 		-e GITHUB_TOKEN=$(GITHUB_TOKEN) \
 		-v $(CURDIR):/qlc-pool \
