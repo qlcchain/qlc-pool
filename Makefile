@@ -8,7 +8,7 @@ K := $(foreach exec,$(EXECUTABLES),\
         $(if $(shell which $(exec)),some string,$(error "No $(exec) in PATH)))
 
 # miner
-VERSION ?= 1.3.0
+VERSION ?= v1.3.0
 BINARY = gqlc-pool
 
 BUILDDIR = build
@@ -43,7 +43,7 @@ snapshot:
 		goreng/golang-cross:$(GO_BUILDER_VERSION) \
 		goreleaser --snapshot --rm-dist
 
-release:
+release: changelog
 	docker run --rm --privileged \
 		-e GITHUB_TOKEN=$(GITHUB_TOKEN) \
 		-v $(CURDIR):/qlc-pool \
