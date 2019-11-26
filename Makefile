@@ -8,7 +8,7 @@ K := $(foreach exec,$(EXECUTABLES),\
         $(if $(shell which $(exec)),some string,$(error "No $(exec) in PATH)))
 
 # miner
-VERSION ?= v1.3.0
+VERSION ?= v1.3.1
 BINARY = gqlc-pool
 
 BUILDDIR = build
