@@ -3,18 +3,27 @@ package main
 import (
 	"time"
 
-	rpc "github.com/qlcchain/jsonrpc2"
 	log "github.com/sirupsen/logrus"
 
 	qlcsdk "github.com/qlcchain/qlc-go-sdk"
+	"github.com/qlcchain/qlc-go-sdk/pkg/types"
 	"github.com/qlcchain/qlc-go-sdk/pkg/util"
 )
 
+const (
+	MaxGetWorkIntervalSec   = 60
+	MaxGetHeaderIntervalSec = 10
+)
+
 type NodeClient struct {
-	client    *rpc.Client
-	minerAddr string
-	algoName  string
-	lastWork  *qlcsdk.PovApiGetWork
+	client       *qlcsdk.QLCClient
+	minerAddrStr string
+	minerAddr    types.Address
+	algoName     string
+
+	lastGetWorkRsp  *qlcsdk.PovApiGetWork
+	lastGetWorkTime time.Time
+	lastHeaderTime  time.Time
 
 	getWorkOk     int
 	getWorkErr    int
@@ -29,10 +38,15 @@ func NewNodeClient(url string, minerAddr string, algoName string) *NodeClient {
 	var err error
 
 	nc := new(NodeClient)
-	nc.minerAddr = minerAddr
+	nc.minerAddrStr = minerAddr
 	nc.algoName = algoName
+	nc.minerAddr, err = types.HexToAddress(minerAddr)
+	if err != nil {
+		log.Errorln(err)
+		return nil
+	}
 
-	nc.client, err = rpc.Dial(url)
+	nc.client, err = qlcsdk.NewQLCClient(url)
 	if err != nil {
 		log.Errorln(err)
 		return nil
@@ -58,17 +72,17 @@ func (nc *NodeClient) Stop() {
 }
 
 func (nc *NodeClient) loop() {
-	log.Infof("node running loop, miner:%s, algo:%s", nc.minerAddr, nc.algoName)
+	log.Infof("node running loop, miner:%s, algo:%s", nc.minerAddrStr, nc.algoName)
 
-	workTicker := time.NewTicker(15 * time.Second)
-	defer workTicker.Stop()
+	fetchTicker := time.NewTicker(5 * time.Second)
+	defer fetchTicker.Stop()
 
 	for {
 		select {
 		case <-nc.quitCh:
 			return
-		case <-workTicker.C:
-			nc.getWork()
+		case <-fetchTicker.C:
+			nc.fetchNewWork()
 		case event := <-nc.eventChan:
 			nc.consumeEvent(event)
 		}
@@ -110,30 +124,57 @@ func (nc *NodeClient) consumeStatisticsTicker(event Event) {
 		nc.getWorkOk, nc.getWorkErr, nc.submitWorkOk, nc.submitWorkErr)
 }
 
-func (nc *NodeClient) getWork() {
-	getWorkRsp := new(qlcsdk.PovApiGetWork)
-	err := nc.client.Call(&getWorkRsp, "pov_getWork", nc.minerAddr, nc.algoName)
-	if err != nil {
-		log.Errorln(err)
-		nc.getWorkErr++
+func (nc *NodeClient) fetchNewWork() {
+	timeNow := time.Now()
+
+	// check getLatestHeader is too fast
+	if nc.lastHeaderTime.Add(MaxGetHeaderIntervalSec * time.Second).After(timeNow) {
 		return
 	}
-	nc.getWorkOk++
-
-	if nc.lastWork != nil && nc.lastWork.WorkHash == getWorkRsp.WorkHash {
+	getHeaderRsp := nc.getLatestHeader()
+	if getHeaderRsp == nil {
 		return
 	}
+	nc.lastHeaderTime = timeNow
 
-	log.Infof("getWork response: %s", util.ToString(getWorkRsp))
+	// check getWork is too fast when parent block not changed
+	if nc.lastGetWorkRsp != nil && nc.lastGetWorkRsp.Previous == getHeaderRsp.GetHash() {
+		if nc.lastGetWorkTime.Add(MaxGetWorkIntervalSec * time.Second).After(timeNow) {
+			return
+		}
+	}
+	getWorkRsp := nc.getWork()
+	if getWorkRsp == nil {
+		return
+	}
+	nc.lastGetWorkTime = timeNow
 
-	nc.lastWork = getWorkRsp
+	// check same work
+	if nc.lastGetWorkRsp != nil && nc.lastGetWorkRsp.WorkHash == getWorkRsp.WorkHash {
+		return
+	}
+	nc.lastGetWorkRsp = getWorkRsp
 
 	GetDefaultEventBus().Publish(EventUpdateApiWork, getWorkRsp)
 }
 
+func (nc *NodeClient) getWork() *qlcsdk.PovApiGetWork {
+	getWorkRsp, err := nc.client.Pov.GetWork(nc.minerAddr, nc.algoName)
+	if err != nil {
+		log.Errorln(err)
+		nc.getWorkErr++
+		return nil
+	}
+	nc.getWorkOk++
+
+	log.Infof("getWork response: %s", util.ToString(getWorkRsp))
+
+	return getWorkRsp
+}
+
 func (nc *NodeClient) submitWork(submitWorkReq *qlcsdk.PovApiSubmitWork) {
 	log.Infof("submitWork request: %s", util.ToString(submitWorkReq))
-	err := nc.client.Call(nil, "pov_submitWork", &submitWorkReq)
+	err := nc.client.Pov.SubmitWork(submitWorkReq)
 	if err != nil {
 		log.Errorln(err)
 		nc.submitWorkErr++
@@ -143,11 +184,13 @@ func (nc *NodeClient) submitWork(submitWorkReq *qlcsdk.PovApiSubmitWork) {
 }
 
 func (nc *NodeClient) getLatestHeader() *qlcsdk.PovApiHeader {
-	latestHeaderRsp := new(qlcsdk.PovApiHeader)
-	err := nc.client.Call(latestHeaderRsp, "pov_getLatestHeader")
+	getHeaderRsp, err := nc.client.Pov.GetLatestHeader()
 	if err != nil {
 		log.Errorln(err)
 		return nil
 	}
-	return latestHeaderRsp
+
+	log.Debugf("getLatestHeader response: %d/%s, ", getHeaderRsp.GetHeight(), getHeaderRsp.GetHash())
+
+	return getHeaderRsp
 }

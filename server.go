@@ -57,6 +57,8 @@ type StratumSession struct {
 	state    int
 	reqMsgID int
 
+	lastDifficulty float64
+
 	sessionID     uint32
 	extraNonce1   uint32
 	remoteIP      string
@@ -570,11 +572,21 @@ func (cs *StratumSession) sendMiningSetDifficulty(diff float64) error {
 		This Means That Difficulty 2 Will Be Applied to Every Next Job Received From the Server.
 	*/
 
+	if cs.lastDifficulty == diff {
+		return nil
+	}
+
 	outMsg := new(StratumMsg)
 	outMsg.Method = "mining.set_difficulty"
 	outMsg.Params = simplejson.NewArray(1)
 	outMsg.Params.AddArray(diff)
-	return cs.sendMessage(outMsg)
+	err := cs.sendMessage(outMsg)
+
+	if err == nil {
+		cs.lastDifficulty = diff
+	}
+
+	return err
 }
 
 func (cs *StratumSession) sendMiningSetExtraNonce(extraNonce1 string, extraNonce2Size int) error {
