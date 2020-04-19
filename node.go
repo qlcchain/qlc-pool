@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	MaxGetWorkIntervalSec   = 60
+	MaxGetWorkIntervalSec   = 60 * 10
 	MaxGetHeaderIntervalSec = 10
 )
 
