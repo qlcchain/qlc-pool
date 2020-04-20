@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	MaxGetWorkIntervalSec   = 60 * 10
+	MaxGetWorkIntervalSec   = 60
 	MaxGetHeaderIntervalSec = 10
 )
 
@@ -139,7 +139,7 @@ func (nc *NodeClient) fetchNewWork() {
 
 	// check getWork is too fast when parent block not changed
 	if nc.lastGetWorkRsp != nil && nc.lastGetWorkRsp.Previous == getHeaderRsp.GetHash() {
-		if nc.lastGetWorkTime.Add(MaxGetWorkIntervalSec * time.Second).After(timeNow) {
+		if nc.lastGetWorkTime.Add(time.Duration(flagWorkInterval) * time.Second).After(timeNow) {
 			return
 		}
 	}
@@ -190,7 +190,7 @@ func (nc *NodeClient) getLatestHeader() *qlcsdk.PovApiHeader {
 		return nil
 	}
 
-	log.Debugf("getLatestHeader response: %d/%s, ", getHeaderRsp.GetHeight(), getHeaderRsp.GetHash())
+	log.Debugf("getLatestHeader response: %d/%s", getHeaderRsp.GetHeight(), getHeaderRsp.GetHash())
 
 	return getHeaderRsp
 }
