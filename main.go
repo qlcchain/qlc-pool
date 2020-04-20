@@ -22,6 +22,7 @@ var flagServerID uint
 var flagDebug bool
 var flagVersion bool
 var flagWorkInterval uint
+var flagPassword string
 
 func main() {
 	initLog()
@@ -40,6 +41,8 @@ func main() {
 	flag.BoolVar(&flagVersion, "version", false, "print version info")
 
 	flag.UintVar(&flagWorkInterval, "workinterval", 60, "time interval(seconds) of new work(30~600)")
+
+	flag.StringVar(&flagPassword, "password", "", "password of miner connect")
 
 	flag.Parse()
 
