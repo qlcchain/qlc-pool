@@ -21,6 +21,8 @@ var flagPort uint
 var flagServerID uint
 var flagDebug bool
 var flagVersion bool
+var flagWorkInterval uint
+var flagPassword string
 
 func main() {
 	initLog()
@@ -38,6 +40,10 @@ func main() {
 	flag.BoolVar(&flagDebug, "debug", false, "enable debug")
 	flag.BoolVar(&flagVersion, "version", false, "print version info")
 
+	flag.UintVar(&flagWorkInterval, "workinterval", 60, "time interval(seconds) of new work(30~600)")
+
+	flag.StringVar(&flagPassword, "password", "", "password of miner connect")
+
 	flag.Parse()
 
 	if flagVersion {
@@ -47,6 +53,11 @@ func main() {
 
 	if flagServerID > 65534 {
 		log.Errorf("invalid serverid")
+		return
+	}
+
+	if flagWorkInterval < 30 || flagWorkInterval > 60*10 {
+		log.Errorf("invalid workinterval")
 		return
 	}
 

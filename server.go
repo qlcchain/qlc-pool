@@ -399,6 +399,12 @@ func (cs *StratumSession) handleMiningAuthorize(reqMsg *StratumMsg) error {
 
 	log.Infof("handleMiningAuthorize: username: %s, password: %s", cs.username, cs.password)
 
+	// check username and password is valid or not
+	if flagPassword != "" && cs.password != flagPassword {
+		log.Infof("handleMiningAuthorize: invalid password")
+		return cs.sendError(reqMsg.ID, 24, "Unauthorized worker")
+	}
+
 	cs.state = SessionStateAuthenticated
 
 	rspMsg := new(StratumMsg)
@@ -406,7 +412,12 @@ func (cs *StratumSession) handleMiningAuthorize(reqMsg *StratumMsg) error {
 	rspMsg.Result = simplejson.New()
 	rspMsg.Result.SetPath(nil, true)
 
-	return cs.sendMessage(rspMsg)
+	err = cs.sendMessage(rspMsg)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (cs *StratumSession) handleMiningSubscribe(reqMsg *StratumMsg) error {
