@@ -8,13 +8,13 @@ K := $(foreach exec,$(EXECUTABLES),\
         $(if $(shell which $(exec)),some string,$(error "No $(exec) in PATH)))
 
 # miner
-VERSION ?= v1.3.1
+VERSION ?= v1.3.2
 BINARY = gqlc-pool
 
 BUILDDIR = build
 GITREV = $(shell git rev-parse --short HEAD)
 BUILDTIME = $(shell date +'%FT%TZ%z')
-GO_BUILDER_VERSION=v1.13.1
+GO_BUILDER_VERSION=v1.14.2
 
 deps:
 	go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
@@ -40,8 +40,7 @@ snapshot:
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v $(GOPATH)/src:/go/src \
 		-w /qlc-pool \
-		goreng/golang-cross:$(GO_BUILDER_VERSION) \
-		goreleaser --snapshot --rm-dist
+		goreng/golang-cross:$(GO_BUILDER_VERSION) --snapshot --rm-dist
 
 release: changelog
 	docker run --rm --privileged \
@@ -50,8 +49,7 @@ release: changelog
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v $(GOPATH)/src:/go/src \
 		-w /qlc-pool \
-		goreng/golang-cross:$(GO_BUILDER_VERSION) \
-		goreleaser --rm-dist --release-notes=CHANGELOG.md
+		goreng/golang-cross:$(GO_BUILDER_VERSION) --rm-dist --release-notes=CHANGELOG.md
 
 lint: 
 	golangci-lint run --fix
